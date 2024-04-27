@@ -2,7 +2,7 @@
 name = "ebuttd"
 version = "0.1.0"
 description = "EBU-TT-D parsing and logic"
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE" }
 authors = [{ name = "Christer Sandberg", email = "chrsan@gmail.com" }]
 dependencies = []
 readme = "README.md"

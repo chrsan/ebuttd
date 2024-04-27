@@ -316,44 +316,47 @@ def _parse_div(body: ET.Element, style_stack: deque[str], ctx: Context) -> None:
         raise ParseError("Missing element `div`")
 
 
-def _scan_int(input: str) -> tuple[str, int, int]:
-    count = 0
-    for c in input:
-        if c.isascii() and c.isdecimal():
-            count += 1
+class Scanner:
+    def __init__(self, input: str) -> None:
+        self.input = input
+
+    def scan_char(self, c: str) -> None:
+        if self.input and self.input[0] == c:
+            self.input = self.input[1:]
         else:
-            break
-    if count == 0:
-        return input, 0, 0
-    return input[count:], int(input[:count]), count
+            raise ValueError()
+
+    def scan_int(self, num_digits: int = 0, limit: int = 0) -> int:
+        count = 0
+        for c in self.input:
+            if c.isascii() and c.isdecimal():
+                count += 1
+            else:
+                break
+        if count == 0 or (num_digits > 0 and count != num_digits):
+            raise ValueError()
+        n = int(self.input[:count])
+        if limit > 0 and n > limit:
+            raise ValueError()
+        self.input = self.input[count:]
+        return n
 
 
 def _parse_timecode(attr: str, input: str) -> float:
-    minutes = True
-    s, value1, count = _scan_int(input)
-    if count == 0:
+    scanner = Scanner(input)
+    try:
+        secs = scanner.scan_int() * 3600.0
+        scanner.scan_char(":")
+        secs += scanner.scan_int(num_digits=2, limit=59) * 60.0
+        scanner.scan_char(":")
+        secs += scanner.scan_int(num_digits=2, limit=59)
+        scanner.scan_char(".")
+        secs += scanner.scan_int(num_digits=3) * 0.001
+    except ValueError:
         raise ParseError(f"Invalid `{attr}` attribute value: {input}")
-    elif count != 2 or value1 > 59:
-        minutes = False
-    if not s.startswith(":"):
+    if scanner.input:
         raise ParseError(f"Invalid `{attr}` attribute value: {input}")
-    s, value2, count = _scan_int(s[1:])
-    if count != 2:
-        raise ParseError(f"Invalid `{attr}` attribute value: {input}")
-    starts_with_colon = s.startswith(":")
-    if not minutes or starts_with_colon:
-        s, value3, count = _scan_int(s[1:])
-        if count != 2:
-            raise ParseError(f"Invalid `{attr}` attribute value: {input}")
-    else:
-        value3, value2, value1 = value2, value1, 0
-    starts_with_dot = s.startswith(".")
-    if value2 > 59 or value3 > 59 or not starts_with_dot:
-        raise ParseError(f"Invalid `{attr}` attribute value: {input}")
-    _, value4, count = _scan_int(s[1:])
-    if count != 3:
-        raise ParseError(f"Invalid `{attr}` attribute value: {input}")
-    return (value1 * 3600.0) + (value2 * 60.0) + value3 + (value4 * 0.001)
+    return secs
 
 
 def _parse_para(
